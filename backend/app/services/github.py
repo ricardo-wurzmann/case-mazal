@@ -96,10 +96,9 @@ async def _fetch_file_content(
         return ""
     return ""
 
-
-async def _fetch_stars(
+async def _fetch_repo_meta(
     client: httpx.AsyncClient, full_name: str, headers: dict[str, str]
-) -> int:
+) -> dict[str, Any]:
     w = 0
     for attempt in range(3):
         if w:
@@ -109,9 +108,15 @@ async def _fetch_stars(
         if w and r.status_code not in (200, 404) and attempt < 2:
             continue
         if r.status_code == 200:
-            return int(r.json().get("stargazers_count", 0))
+            data = r.json()
+            return {
+                "stars": int(data.get("stargazers_count", 0)),
+                "pushed_at": str(data.get("pushed_at") or ""),
+                "archived": bool(data.get("archived", False)),
+                "open_issues": int(data.get("open_issues_count", 0)),
+            }
         break
-    return 0
+    return {"stars": 0, "pushed_at": "", "archived": False, "open_issues": 0}
 
 
 async def search_code(query: str) -> list[dict[str, Any]]:
@@ -165,26 +170,59 @@ async def search_code(query: str) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     async with httpx.AsyncClient() as client:
         h = _github_headers()
-        stars_by_repo: dict[str, int] = {rn: 0 for rn in seen_repos}
+        meta_by_repo: dict[str, dict] = {}
         for rname in seen_repos:
-            stars_by_repo[rname] = await _fetch_stars(client, rname, h)
+            meta_by_repo[rname] = await _fetch_repo_meta(client, rname, h)
         for item in selected:
             api_url = item.get("url") or ""
             if not api_url:
                 continue
             repo = item.get("repository") or {}
             rname = str(repo.get("full_name", ""))
+            meta = meta_by_repo.get(rname, {"stars": 0, "pushed_at": "", "archived": False, "open_issues": 0})  # <- estava faltando
             raw = await _fetch_file_content(client, api_url, h)
-            results.append(
-                {
-                    "repo_full_name": rname,
-                    "repo_url": str(
-                        repo.get("html_url", "") or f"https://github.com/{rname}"
-                    ),
-                    "repo_stars": int(stars_by_repo.get(rname, 0)),
-                    "file_path": str(item.get("path", "")),
-                    "raw_content": raw,
-                }
-            )
+            results.append({
+                "repo_full_name": rname,
+                "repo_url": str(repo.get("html_url", "") or f"https://github.com/{rname}"),  # <- estava com ...
+                "repo_stars": meta.get("stars", 0),
+                "repo_pushed_at": meta.get("pushed_at", ""),
+                "repo_archived": meta.get("archived", False),
+                "repo_open_issues": meta.get("open_issues", 0),
+                "file_path": str(item.get("path", "")),  # <- estava com ...
+                "raw_content": raw,
+            })
 
     return results
+
+async def search_code_hybrid(subproblem) -> list[dict[str, Any]]:
+    """
+    Busca semântica (query principal) + busca estrutural (padrões de código).
+    As structural_queries encontram repos relevantes mesmo sem README descritivo.
+    Deduplica por (repo, arquivo) e respeita SEARCH_MAX_REPOS.
+    """
+    all_queries = [subproblem.query] + (subproblem.structural_queries or [])[:2]
+
+    seen: set[tuple[str, str]] = set()
+    merged: list[dict[str, Any]] = []
+
+    for query in all_queries:
+        try:
+            results = await search_code(query)
+        except Exception as exc:
+            logger.warning("structural query '%s' failed: %s", query, exc)
+            continue
+        for r in results:
+            key = (r["repo_full_name"], r["file_path"])
+            if key not in seen:
+                seen.add(key)
+                merged.append(r)
+
+    # Re-aplica o limite de repos distintos sobre o resultado combinado
+    by_repo: dict[str, list] = {}
+    for r in merged:
+        rn = r["repo_full_name"]
+        if rn not in by_repo and len(by_repo) >= config.SEARCH_MAX_REPOS:
+            continue
+        by_repo.setdefault(rn, []).append(r)
+
+    return [r for items in by_repo.values() for r in items]

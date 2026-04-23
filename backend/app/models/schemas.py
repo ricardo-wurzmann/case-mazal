@@ -32,6 +32,10 @@ class FileExtract(BaseModel):
     location_score: float
     total_score: float = 0.0
     subproblem: str = ""
+    repo_stars: int = 0
+    repo_pushed_at: str = ""
+    repo_archived: bool = False
+    repo_open_issues: int = 0
 
 
 class SearchStats(BaseModel):

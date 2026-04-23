@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -33,7 +33,6 @@ LANGUAGE_EXTENSIONS: dict[str, str] = {
 DECOMPOSE_SYSTEM = """You are a senior software architect. 
 Your job is to decompose a project idea into concrete technical subproblems and generate optimized GitHub code search queries for each one.
 You must respond ONLY with a valid JSON object — no markdown, no explanation, no backticks."""
-
 DECOMPOSE_USER = """Project idea: "{idea}"
 
 Analyze this project and respond with a JSON object in exactly this format:
@@ -44,7 +43,11 @@ Analyze this project and respond with a JSON object in exactly this format:
     {{
       "name": "short name of subproblem",
       "description": "what this subproblem solves",
-      "query": "optimized github code search query extension:py"
+      "query": "optimized github code search query extension:py",
+      "structural_queries": [
+        "ClassName method extension:py",
+        "import library function extension:py"
+      ]
     }}
   ]
 }}
@@ -54,15 +57,21 @@ Rules:
 - Generate 3 to 5 subproblems that together cover the full project.
 - Each query must be specific enough to find real code (not docs), include the extension filter, and use 2-4 keywords max.
 - Queries must target actual implementation code, not setup or configuration.
-- Example queries: "whisper transcribe audio extension:py", "yt-dlp download video extension:py", "ffmpeg extract audio subprocess extension:py"
+- structural_queries: exactly 2 queries that search for CODE PATTERNS, not keywords.
+  These find relevant code even in repos without README or descriptive names.
+  Use class names, method names, or import patterns as plain keywords.
+  IMPORTANT: use ONLY simple alphanumeric words — NO dots, NO equals signs, NO special characters.
+  Bad examples (will fail): "csv.DictWriter extension:py", "bot = Bot extension:py", "message.text extension:py"
+  Good examples (will work): "DictWriter writerow extension:py", "ApplicationBuilder token extension:py", "MessageHandler filters extension:py"
+- Example semantic queries: "whisper transcribe audio extension:py", "yt-dlp download video extension:py"
 - Respond ONLY with the JSON object."""
-
 
 @dataclass
 class Subproblem:
     name: str
     description: str
     query: str
+    structural_queries: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -78,7 +87,7 @@ async def decompose_idea(idea: str) -> DecompositionResult:
 
     payload = {
         "model": config.OPENROUTER_MODEL,
-        "max_tokens": 800,
+        "max_tokens": 1000,
         "temperature": 0.2,
         "messages": [
             {"role": "system", "content": DECOMPOSE_SYSTEM},
@@ -117,6 +126,7 @@ async def decompose_idea(idea: str) -> DecompositionResult:
             name=str(sp.get("name", "")),
             description=str(sp.get("description", "")),
             query=str(sp.get("query", "")),
+            structural_queries=[str(q) for q in sp.get("structural_queries", [])[:2]],
         )
         for sp in parsed.get("subproblems", [])
         if sp.get("query")
@@ -126,10 +136,11 @@ async def decompose_idea(idea: str) -> DecompositionResult:
         raise ValueError("LLM returned no subproblems")
 
     logger.info(
-        "Decomposed '%s' into %d subproblems (language=%s)",
+        "Decomposed '%s' into %d subproblems (language=%s, structural_queries=%d)",
         idea[:60],
         len(subproblems),
         language,
+        sum(len(sp.structural_queries) for sp in subproblems),
     )
 
     return DecompositionResult(

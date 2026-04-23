@@ -16,7 +16,7 @@ from app.models.schemas import (
 )
 from app.services import extractor, scorer
 from app.services.decomposer import DecompositionResult, Subproblem, decompose_idea
-from app.services.github import search_code
+from app.services.github import search_code_hybrid
 from app.services.synthesizer import stream_synthesis
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ async def _search_subproblem(
     subproblem: Subproblem,
 ) -> tuple[Subproblem, list[FileExtract]]:
     try:
-        raw_files = await search_code(subproblem.query)
+        raw_files = await search_code_hybrid(subproblem)
     except Exception:
         logger.exception("Search failed for subproblem '%s'", subproblem.name)
         return subproblem, []
