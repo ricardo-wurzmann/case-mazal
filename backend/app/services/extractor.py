@@ -133,12 +133,18 @@ def _extract_snippets(lines: list[str], query_term: str, max_lines: int) -> list
 
     return collected
 
-
 def extract_usage(file_info: dict[str, Any], query: str) -> FileExtract:
     raw: str = file_info.get("raw_content") or ""
     file_path: str = file_info.get("file_path") or ""
     repo_name: str = file_info.get("repo_full_name") or ""
     repo_url: str = file_info.get("repo_url") or ""
+
+    # --- campos novos ---
+    repo_stars: int = int(file_info.get("repo_stars") or 0)
+    repo_pushed_at: str = str(file_info.get("repo_pushed_at") or "")
+    repo_archived: bool = bool(file_info.get("repo_archived") or False)
+    repo_open_issues: int = int(file_info.get("repo_open_issues") or 0)
+    # --------------------
 
     language = _detect_language(file_path)
     loc_score = _location_score(file_path)
@@ -160,4 +166,8 @@ def extract_usage(file_info: dict[str, Any], query: str) -> FileExtract:
         frequency=frequency,
         location_score=loc_score,
         total_score=0.0,
+        repo_stars=repo_stars,
+        repo_pushed_at=repo_pushed_at,
+        repo_archived=repo_archived,
+        repo_open_issues=repo_open_issues,
     )
