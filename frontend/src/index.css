@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply antialiased;
+}
+
+/* Code blocks: ChatWindow custom [data-codelens-code] handles most styling */
+.codelens-md [data-codelens-code] pre,
+.codelens-md [data-codelens-code] pre code {
+  @apply m-0 border-0 !bg-transparent p-0 !shadow-none;
+}
+
+.codelens-md a {
+  @apply text-sky-400 underline-offset-2 hover:underline;
+}
+
+.codelens-md p {
+  @apply mb-3 last:mb-0;
+}
+
+.codelens-md ul,
+.codelens-md ol {
+  @apply mb-3 ml-4 list-outside;
+}
+
+.codelens-md li {
+  @apply mb-1;
+}
+
+.codelens-md h1,
+.codelens-md h2,
+.codelens-md h3 {
+  @apply mt-4 mb-2 font-semibold text-slate-100 first:mt-0;
+}
