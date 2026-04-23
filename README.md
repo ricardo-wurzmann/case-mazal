@@ -93,58 +93,29 @@ O frontend consome eventos **Server-Sent Events** (SSE) com tipos: `status`, `de
 
 ---
 
-## Executar com Docker
+## Para rodar o projeto inteiro
 
-Na raiz do repositório:
 
 ```bash
+#Clonar o projeto
+git clone https://github.com/ricardo-wurzmann/case-mazal
+
+#Entrar na pasta
+cd case-mazal
+
+#Criar o .env a partir do exemplo
+cp .env.example .env
+# preencher .env com GITHUB_TOKEN e OPENROUTER_API_KEY
+
 docker compose up --build
+# acessar http://localhost:5173
+
 ```
 
 - **API**: <http://localhost:8000> (documentação interativa: <http://localhost:8000/docs>)
 - **Frontend (Vite dev)**: <http://localhost:5173>
 
 O serviço `frontend` aguarda o *healthcheck* do `backend` antes de arrancar. Abra o frontend no browser e descreva uma ideia de projeto (10 a 1000 caracteres, conforme validação do backend).
-
----
-
-## Desenvolvimento local
-
-### Backend
-
-```bash
-cd backend
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
-# Na raiz do repo ou em backend, com .env preenchido:
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Certifique-se de que as variáveis (por exemplo `OPENROUTER_API_KEY`) estão disponíveis no ambiente ou carregues `.env` na raiz; o `app/config.py` usa `load_dotenv()`.
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-# Opcional, se a API não estiver em 127.0.0.1:8000:
-# set VITE_API_URL=http://127.0.0.1:8000
-npm run dev
-```
-
-CORS no backend está restrito a `http://localhost:5173` e `http://127.0.0.1:5173`.
-
-### Build de produção (frontend)
-
-```bash
-cd frontend
-npm run build
-npm run preview
-```
-
-Ajuste `VITE_API_URL` em tempo de build se a API estiver noutro *host*.
 
 ---
 
